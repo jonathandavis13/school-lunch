@@ -1,0 +1,4 @@
+.venv/
+*.csv
+familymenu_raw.json
+familymenu_raw.txt
