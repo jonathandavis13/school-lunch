@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lunch Menu – Next 5 School Days</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card-bg: #ffffff;
+      --card-bg-dark: #111827;
+      --text-main: #111827;
+      --text-main-dark: #e5e7eb;
+      --text-sub: #6b7280;
+      --accent-blue: #0a84ff;
+      --accent-green: #30d158;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0b1020 0, #020617 55%, #000 100%);
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .widget {
+      position: relative;
+      max-width: 520px;
+      width: 100%;
+      border-radius: 20px;
+      padding: 14px 16px 12px 16px;
+      box-shadow:
+        0 18px 45px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(148, 163, 184, 0.25);
+      background: linear-gradient(
+        135deg,
+        rgba(10, 132, 255, 0.12),
+        rgba(48, 209, 88, 0.18)
+      );
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      color: var(--text-main-dark);
+    }
+
+    .widget-inner {
+      border-radius: 16px;
+      padding: 10px 12px 10px 12px;
+      background: radial-gradient(circle at top left,
+                  rgba(15, 23, 42, 0.85),
+                  rgba(15, 23, 42, 0.98));
+      color: #e5e7eb;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sub);
+      letter-spacing: 0.02em;
+    }
+
+    .header span {
+      margin-right: 8px;
+    }
+
+    .header .pill {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+    }
+
+    .days {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .day-row {
+      display: flex;
+      align-items: flex-start;
+      font-size: 11px;
+    }
+
+    .day-label {
+      flex: 0 0 96px;
+      font-weight: 600;
+      color: #e5e7eb;
+      padding-top: 1px;
+    }
+
+    .day-items {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      color: #d1d5db;
+    }
+
+    .day-items .muted {
+      color: #6b7280;
+      font-style: italic;
+    }
+
+    .footer {
+      margin-top: 6px;
+      font-size: 10px;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer a {
+      color: #93c5fd;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(147, 197, 253, 0.5);
+    }
+
+    .footer a:hover {
+      border-bottom-style: solid;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .status.error {
+      color: #fecaca;
+    }
+
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 2px solid rgba(148, 163, 184, 0.45);
+      border-top-color: #93c5fd;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .day-label {
+        flex-basis: 88px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget">
+    <div class="widget-inner">
+      <div class="header">
+        <span id="header-text">Lunch • Next 5 school days</span>
+        <span class="pill" id="pill-text">LIVE</span>
+      </div>
+
+      <div class="status" id="status">
+        <span class="spinner"></span>Loading lunch menu…
+      </div>
+
+      <div class="days" id="days" style="display:none;"></div>
+
+      <div class="footer">
+        <span id="last-updated"></span>
+        <a href="#" id="raw-link" target="_blank" rel="noreferrer">Open raw menu</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Config (same values as your Scriptable script) ────────────────
+    const CONFIG = {
+      buildingId: "d76afdbb-caa8-ed11-8e6a-c150c5c7a01a",
+      districtId: "9fd1237e-53a6-ed11-8e69-985645bc2745",
+      mealSession: "Lunch",
+      daysToShow: 5,
+      skipWeekends: true,
+      maxItemsPerDay: 3,
+      bullet: "•",
+      exclude: [
+        // "Milk", "Chocolate Milk", "Assorted Fruit", ...
+      ],
+    };
+
+    // ── Utils (adapted from your Scriptable code) ─────────────────────
+    function fmtAPI(d) { // M-D-YYYY (no leading zeros)
+      return (d.getMonth() + 1) + "-" + d.getDate() + "-" + d.getFullYear();
+    }
+
+    function ymd(d) { // YYYY-MM-DD
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return d.getFullYear() + "-" + mm + "-" + dd;
+    }
+
+    function niceDate(d) {
+      return new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }).format(d);
+    }
+
+    function isWeekend(d) {
+      const w = d.getDay();
+      return w === 0 || w === 6;
+    }
+
+    function nextSchoolDays(n, skipWeekends = true) {
+      const out = [];
+      let d = new Date();
+      while (out.length < n) {
+        if (!(skipWeekends && isWeekend(d))) out.push(new Date(d));
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    }
+
+    function uniq(arr) {
+      return [...new Set(arr)];
+    }
+
+    function lowerSet(arr) {
+      return new Set(arr.map((s) => s.toLowerCase()));
+    }
+
+    // ── Fetch LINQConnect JSON from browser ───────────────────────────
+    async function fetchRange(start, end) {
+      const base = "https://api.linqconnect.com/api/FamilyMenu";
+      const url =
+        base +
+        "?buildingId=" + encodeURIComponent(CONFIG.buildId ?? CONFIG.buildingId) +
+        "&districtId=" + encodeURIComponent(CONFIG.districtId) +
+        "&startDate=" + encodeURIComponent(fmtAPI(start)) +
+        "&endDate=" + encodeURIComponent(fmtAPI(end));
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error("FamilyMenu request failed: " + res.status + " " + res.statusText + "\n" + text);
+      }
+
+      return { json: await res.json(), url };
+    }
+
+    // ── Extract (date → [recipe names]) from JSON (same logic) ────────
+    function extractFromJSON(data, mealSession, wantedDates) {
+      const out = new Map(); // ymd -> [names]
+      const sessions = (data && data.FamilyMenuSessions) || [];
+      const lowerMeal = mealSession.toLowerCase();
+
+      for (const session of sessions) {
+        const serving = (session && session.ServingSession || "").toLowerCase();
+        const planNames = (session && session.MenuPlans || []).map((p) =>
+          (p && p.MenuPlanName || "").toLowerCase()
+        );
+
+        const mealOk =
+          serving === lowerMeal || planNames.some((n) => n.includes(lowerMeal));
+        if (!mealOk) continue;
+
+        for (const plan of session.MenuPlans || []) {
+          for (const day of plan.Days || []) {
+            let dtxt = (day && (day.Date || day.ServiceDate || day.MenuDate)) || "";
+            if (!dtxt) continue;
+
+            const d = new Date(dtxt); // Date parses ISO-ish formats
+            const key = ymd(d);
+            if (!wantedDates.has(key)) continue;
+
+            for (const meal of day.MenuMeals || []) {
+              for (const cat of meal.RecipeCategories || []) {
+                const catName = (
+                  cat.RecipeCategoryName ||
+                  cat.CategoryName ||
+                  cat.Name ||
+                  cat.DisplayName ||
+                  ""
+                ).toString().toLowerCase();
+
+                // Only include "Main Entree" category
+                if (!catName.includes("main entree")) continue;
+
+                for (const rec of cat.Recipes || []) {
+                  const name =
+                    rec.RecipeName ||
+                    rec.DisplayName ||
+                    rec.ItemName ||
+                    rec.Name;
+                  if (name) {
+                    if (!out.has(key)) out.set(key, []);
+                    out.get(key).push(name.trim());
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return out;
+    }
+
+    // ── Render to DOM (our "widget") ──────────────────────────────────
+    function render(days, byDate, apiUrl) {
+      const daysContainer = document.getElementById("days");
+      const statusEl = document.getElementById("status");
+      const linkEl = document.getElementById("raw-link");
+      const updatedEl = document.getElementById("last-updated");
+      const headerEl = document.getElementById("header-text");
+
+      headerEl.textContent = `${CONFIG.mealSession} • Next ${CONFIG.daysToShow} school days`;
+      linkEl.href = apiUrl;
+
+      const excl = lowerSet(CONFIG.exclude);
+      daysContainer.innerHTML = "";
+
+      for (const d of days) {
+        const key = ymd(d);
+        const items = (byDate.get(key) || []).map((s) => s.trim());
+        const filtered = uniq(items).filter((s) => !excl.has(s.toLowerCase()));
+
+        const row = document.createElement("div");
+        row.className = "day-row";
+
+        const label = document.createElement("div");
+        label.className = "day-label";
+        label.textContent = niceDate(d);
+        row.appendChild(label);
+
+        const right = document.createElement("div");
+        right.className = "day-items";
+
+        if (!filtered.length) {
+          const none = document.createElement("div");
+          none.className = "muted";
+          none.textContent = "(no lunch items)";
+          right.appendChild(none);
+        } else {
+          const shown = filtered.slice(0, CONFIG.maxItemsPerDay);
+          const more = Math.max(0, filtered.length - shown.length);
+
+          for (const name of shown) {
+            const div = document.createElement("div");
+            div.textContent = `${CONFIG.bullet} ${name}`;
+            right.appendChild(div);
+          }
+          if (more > 0) {
+            const moreDiv = document.createElement("div");
+            moreDiv.className = "muted";
+            moreDiv.textContent = `+${more} more`;
+            right.appendChild(moreDiv);
+          }
+        }
+
+        row.appendChild(right);
+        daysContainer.appendChild(row);
+      }
+
+      statusEl.classList.remove("error");
+      statusEl.innerHTML = "";
+      daysContainer.style.display = "flex";
+
+      const now = new Date();
+      updatedEl.textContent = "Updated " + now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    // ── Main entry point ──────────────────────────────────────────────
+    async function loadMenu() {
+      const statusEl = document.getElementById("status");
+      const daysContainer = document.getElementById("days");
+
+      try {
+        const days = nextSchoolDays(CONFIG.daysToShow, CONFIG.skipWeekends);
+        const start = days[0];
+        const end = days[days.length - 1];
+        const wanted = new Set(days.map(ymd));
+
+        statusEl.classList.remove("error");
+        statusEl.innerHTML = '<span class="spinner"></span>Loading lunch menu…';
+
+        const { json, url } = await fetchRange(start, end);
+        const byDate = extractFromJSON(json, CONFIG.mealSession, wanted);
+
+        render(days, byDate, url);
+      } catch (err) {
+        console.error(err);
+        statusEl.classList.add("error");
+        statusEl.textContent = "Error loading lunch menu. Check console for details.";
+        daysContainer.style.display = "none";
+      }
+    }
+
+    // Kick off on load
+    loadMenu();
+  </script>
+</body>
+</html>
